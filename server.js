@@ -60,11 +60,9 @@ app.get('/', (req, res) => {
             const text = userInput.value.trim();
             if (!text) return;
 
-            // Append User Message
             appendMessage(text, 'user');
             userInput.value = '';
 
-            // Loading state
             const loadingId = appendMessage('Thinking...', 'bot', true);
 
             try {
@@ -94,13 +92,13 @@ app.get('/', (req, res) => {
         });
 
         function appendMessage(text, sender, isLoading = false) {
-            const id = 'msg-' + Math.random().toString(36.substring(2, 9));
+            const id = 'msg-' + Math.random().toString(36).substring(2, 9);
             const div = document.createElement('div');
             div.id = id;
-            div.className = \`flex \${sender === 'user' ? 'justify-end' : 'justify-start'}\`;
+            div.className = 'flex ' + (sender === 'user' ? 'justify-end' : 'justify-start');
             
             const bubble = document.createElement('div');
-            bubble.className = \`p-3 rounded-lg max-w-xl text-sm \${sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-200'} \${isLoading ? 'italic text-gray-400' : ''}\`;
+            bubble.className = 'p-3 rounded-lg max-w-xl text-sm ' + (sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-200') + (isLoading ? ' italic text-gray-400' : '');
             bubble.innerText = text;
             
             div.appendChild(bubble);
@@ -119,7 +117,7 @@ app.get('/', (req, res) => {
   `);
 });
 
-// Backend Proxy Route to handle API calls securely & bypass CORS
+// Backend Proxy Route
 app.post('/api/chat', async (req, res) => {
   const { endpoint, key, type, message } = req.body;
 
@@ -135,17 +133,14 @@ app.post('/api/chat', async (req, res) => {
     let fetchBody = {};
 
     if (type === 'gemini') {
-      // Gemini format (e.g., https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=YOUR_KEY)
-      // Agar URL me ?key= nahi hai toh append kar sakte hain ya Authorization header use kar sakte hain
       fetchHeaders['x-goog-api-key'] = key;
       fetchBody = {
         contents: [{ parts: [{ text: message }] }]
       };
     } else {
-      // OpenAI format (Standard Bearer Token)
-      fetchHeaders['Authorization'] = \`Bearer \${key}\`;
+      fetchHeaders['Authorization'] = `Bearer ${key}`;
       fetchBody = {
-        model: "gpt-3.5-turbo", // ya jo bhi endpoint support kare
+        model: "gpt-3.5-turbo",
         messages: [{ role: "user", content: message }]
       };
     }
@@ -173,4 +168,4 @@ app.post('/api/chat', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(\`Server running on port \${PORT}\`));
+app.listen(PORT, () => console.log('Server running on port ' + PORT));
