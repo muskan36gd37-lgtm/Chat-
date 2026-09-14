@@ -18,12 +18,14 @@ app.get('/', (req, res) => {
 <body class="bg-gray-900 text-white h-screen flex flex-col">
 
     <!-- Header / Config Bar -->
-    <header class="bg-gray-800 p-4 border-b border-gray-700 flex flex-wrap gap-4 items-center justify-between">
+    <header class="bg-gray-800 p-4 border-b border-gray-700 flex flex-wrap gap-3 items-center justify-between">
         <h1 class="text-xl font-bold text-blue-400">⚡ Cloud API Chat Tester</h1>
         <div class="flex flex-wrap gap-2 items-center w-full md:w-auto">
-            <input type="text" id="apiUrl" placeholder="API Endpoint URL" class="bg-gray-700 px-3 py-1.5 rounded text-sm flex-1 md:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="password" id="apiKey" placeholder="API Key" class="bg-gray-700 px-3 py-1.5 rounded text-sm flex-1 md:w-48 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="text" id="apiUrl" placeholder="API Endpoint URL" class="bg-gray-700 px-3 py-1.5 rounded text-sm flex-1 md:w-60 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="text" id="apiModel" placeholder="Model Name (e.g. anthropic.claude-...)" class="bg-gray-700 px-3 py-1.5 rounded text-sm flex-1 md:w-48 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="password" id="apiKey" placeholder="API Key" class="bg-gray-700 px-3 py-1.5 rounded text-sm flex-1 md:w-36 focus:outline-none focus:ring-2 focus:ring-blue-500">
             <select id="apiType" class="bg-gray-700 px-3 py-1.5 rounded text-sm focus:outline-none">
+                <option value="anthropic">Anthropic / Bedrock Style</option>
                 <option value="gemini">Gemini Style</option>
                 <option value="openai">OpenAI Style</option>
             </select>
@@ -34,7 +36,7 @@ app.get('/', (req, res) => {
     <div id="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl w-full mx-auto">
         <div class="flex justify-start">
             <div class="bg-gray-800 p-3 rounded-lg max-w-lg text-sm text-gray-300">
-                Hello! Apni API Key aur Endpoint upar enter karein, aur chat test karna start karein.
+                Hello! Apna Endpoint, Model, aur API Key enter karein, phir chat test karna start karein.
             </div>
         </div>
     </div>
@@ -52,6 +54,7 @@ app.get('/', (req, res) => {
         const chatForm = document.getElementById('chatForm');
         const userInput = document.getElementById('userInput');
         const apiUrl = document.getElementById('apiUrl');
+        const apiModel = document.getElementById('apiModel');
         const apiKey = document.getElementById('apiKey');
         const apiType = document.getElementById('apiType');
 
@@ -71,6 +74,7 @@ app.get('/', (req, res) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         endpoint: apiUrl.value,
+                        model: apiModel.value,
                         key: apiKey.value,
                         type: apiType.value,
                         message: text
@@ -98,7 +102,7 @@ app.get('/', (req, res) => {
             div.className = 'flex ' + (sender === 'user' ? 'justify-end' : 'justify-start');
             
             const bubble = document.createElement('div');
-            bubble.className = 'p-3 rounded-lg max-w-xl text-sm ' + (sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-200') + (isLoading ? ' italic text-gray-400' : '');
+            bubble.className = 'p-3 rounded-lg max-w-xl text-sm whitespace-pre-wrap ' + (sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-200') + (isLoading ? ' italic text-gray-400' : '');
             bubble.innerText = text;
             
             div.appendChild(bubble);
@@ -119,10 +123,10 @@ app.get('/', (req, res) => {
 
 // Backend Proxy Route
 app.post('/api/chat', async (req, res) => {
-  const { endpoint, key, type, message } = req.body;
+  const { endpoint, model, key, type, message } = req.body;
 
   if (!endpoint || !key) {
-    return res.json({ error: 'Endpoint aur API Key dono dena zaroori hai!' });
+    return res.json({ error: 'Endpoint URL aur API Key dono dena zaroori hai!' });
   }
 
   try {
@@ -132,7 +136,16 @@ app.post('/api/chat', async (req, res) => {
     };
     let fetchBody = {};
 
-    if (type === 'gemini') {
+    if (type === 'anthropic') {
+      // AWS Bedrock / Anthropic Format
+      fetchHeaders['x-api-key'] = key;
+      fetchHeaders['anthropic-version'] = '2023-06-01';
+      fetchBody = {
+        model: model || "anthropic.claude-3-5-sonnet-20241022-v1:0",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: message }]
+      };
+    } else if (type === 'gemini') {
       fetchHeaders['x-goog-api-key'] = key;
       fetchBody = {
         contents: [{ parts: [{ text: message }] }]
@@ -140,7 +153,7 @@ app.post('/api/chat', async (req, res) => {
     } else {
       fetchHeaders['Authorization'] = `Bearer ${key}`;
       fetchBody = {
-        model: "gpt-3.5-turbo",
+        model: model || "gpt-3.5-turbo",
         messages: [{ role: "user", content: message }]
       };
     }
@@ -154,7 +167,9 @@ app.post('/api/chat', async (req, res) => {
     const data = await apiRes.json();
 
     let reply = "";
-    if (type === 'gemini') {
+    if (type === 'anthropic') {
+      reply = data.content?.[0]?.text || JSON.stringify(data);
+    } else if (type === 'gemini') {
       reply = data.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data);
     } else {
       reply = data.choices?.[0]?.message?.content || JSON.stringify(data);
